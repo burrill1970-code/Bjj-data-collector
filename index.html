@@ -1,0 +1,544 @@
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>BJJ Data Collector – Drive Upload</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #eee;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 15px;
+            text-align: center;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { font-size: 1.6rem; margin: 10px 0; }
+        .mode-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin: 15px 0;
+        }
+        .mode-btn {
+            background: #333;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .mode-btn.active { background: #4CAF50; }
+        .panel {
+            background: #1e1e1e;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .hidden { display: none; }
+        .media-container {
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 10px 0;
+            text-align: center;
+        }
+        video, img, canvas {
+            max-width: 100%;
+            max-height: 50vh;
+            vertical-align: middle;
+        }
+        canvas { background: #000; width: 100%; height: auto; }
+        .controls {
+            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        button, input {
+            background: #2c2c2c;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        input { background: #111; border: 1px solid #444; flex: 1; min-width: 180px; }
+        .status { font-size: 0.7rem; color: #aaa; margin: 5px; }
+        .save-btn {
+            background: #4CAF50;
+            margin-top: 10px;
+            font-size: 1rem;
+            padding: 10px 20px;
+        }
+        .label-panel {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 10px;
+            text-align: left;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 10px;
+        }
+        .label-group {
+            background: #1e1e1e;
+            padding: 8px;
+            border-radius: 6px;
+        }
+        .label-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.8rem;
+        }
+        select, textarea {
+            width: 100%;
+            padding: 5px;
+            background: #111;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+        .shortcut-hint {
+            font-size: 0.6rem;
+            color: #aaa;
+            margin-top: 3px;
+        }
+        .footer {
+            font-size: 0.7rem;
+            margin-top: 20px;
+            opacity: 0.6;
+        }
+        .required { border-left: 3px solid #4CAF50; padding-left: 5px; }
+        .thumbnail-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            padding: 8px;
+            border-radius: 8px;
+        }
+        .thumbnail {
+            position: relative;
+            width: 80px;
+            height: 60px;
+            background: #000;
+            border: 1px solid #444;
+            cursor: pointer;
+        }
+        .thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .thumbnail .delete-badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: red;
+            color: white;
+            font-size: 10px;
+            width: 16px;
+            height: 16px;
+            text-align: center;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .auto-detect {
+            background: #4CAF50;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            margin-left: 8px;
+            cursor: pointer;
+        }
+        .labeler-input {
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 5px;
+            width: 100%;
+            color: white;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>BJJ Movement Analyst – Direct to Drive</h1>
+    <div class="mode-buttons">
+        <button id="btnVideoMode" class="mode-btn active">🎥 Video Mode</button>
+        <button id="btnImageMode" class="mode-btn">🖼️ Image Mode</button>
+    </div>
+
+    <!-- Video Mode Panel -->
+    <div id="videoModePanel" class="panel">
+        <div class="media-container"><video id="videoPlayer" controls style="width:100%"></video></div>
+        <div class="controls">
+            <input type="file" id="videoUpload" accept="video/*">
+            <button id="extractFramesBtn">📸 Extract Frames (2 FPS)</button>
+        </div>
+        <div id="thumbnailContainer" class="thumbnail-grid"></div>
+        <div class="status" id="videoStatus">Load a video to begin.</div>
+    </div>
+
+    <!-- Image Mode Panel -->
+    <div id="imageModePanel" class="panel hidden">
+        <div class="media-container"><canvas id="imageCanvas" style="width:100%; background:#000;"></canvas></div>
+        <div class="controls">
+            <input type="file" id="imageUpload" accept="image/*">
+            <button id="loadImageBtn">Load Image</button>
+        </div>
+        <div class="status" id="imageStatus">Load an image to begin.</div>
+    </div>
+
+    <!-- Label Panel -->
+    <div class="label-panel" id="labelPanel">
+        <!-- Labeler name -->
+        <div class="label-group required">
+            <label>Your Name (for credit)</label>
+            <input type="text" id="labelerName" class="labeler-input" placeholder="Enter your name">
+        </div>
+
+        <!-- Core workflow fields (same as before) -->
+        <div class="label-group required"><label>Entry Initiator <span class="shortcut-hint">[1]</span></label><select id="entryInitiator"><option value="thing1">Thing 1</option><option value="thing2">Thing 2</option><option value="both">Both</option><option value="none">None</option></select></div>
+        <div class="label-group required"><label>Entry Method <span class="shortcut-hint">[2]</span></label><select id="entryMethod"><option value="takedown_lower">Takedown (lower body)</option><option value="throw_upper">Throw (upper body)</option><option value="guard_pull">Guard Pull</option><option value="other">Other</option></select></div>
+        <div class="label-group required"><label>Landing Position <span class="shortcut-hint">[3]</span></label><select id="landingPosition"><option value="guard">Guard</option><option value="half_guard">Half Guard</option><option value="side_control">Side Control</option><option value="knee_on_belly">Knee on Belly</option><option value="north_south">North/South</option><option value="mount">Mount</option><option value="back">Back</option><option value="turtle">Turtle</option><option value="standing">Standing</option><option value="other">Other</option></select></div>
+        <div class="label-group required"><label>Top Player <span class="shortcut-hint">[4]</span></label><select id="topPlayer"><option value="thing1">Thing 1</option><option value="thing2">Thing 2</option><option value="none">None</option></select><div class="auto-detect" id="autoDetectTop">Auto-detect (hips)</div></div>
+        <div class="label-group required"><label>Top Phase <span class="shortcut-hint">[5]</span></label><select id="topPhase"><option value="standing">Standing</option><option value="on_top">On Top</option><option value="passed_guard">Passed Guard</option><option value="limb_isolated">Limb Isolated</option><option value="submission_applied">Submission Applied</option></select></div>
+        <div class="label-group required"><label>Bottom Phase <span class="shortcut-hint">[6]</span></label><select id="bottomPhase"><option value="standing">Standing</option><option value="on_bottom">On Bottom</option><option value="guard_achieved">Guard Achieved</option><option value="escaped">Escaped</option><option value="submitted">Submitted</option></select></div>
+        <div class="label-group"><label>Arm Frames <span class="shortcut-hint">[7]</span></label><select id="armFrames"><option value="none">None</option><option value="left">Left</option><option value="right">Right</option><option value="both">Both</option></select></div>
+        <div class="label-group"><label>Leg Frames <span class="shortcut-hint">[8]</span></label><select id="legFrames"><option value="none">None</option><option value="left">Left</option><option value="right">Right</option><option value="both">Both</option></select></div>
+        <div id="guardStatusGroup" class="label-group hidden"><label>Guard Status <span class="shortcut-hint">[9]</span></label><select id="guardStatus"><option value="active_guard">Active Guard</option><option value="passive_guard">Passive Guard</option><option value="no_guard">No Guard</option></select></div>
+        <div id="torsoControlGroup" class="label-group hidden"><label>Torso Control <span class="shortcut-hint">[0]</span></label><select id="torsoControl"><option value="legs_active">Legs Active</option><option value="torso_only">Torso Only</option><option value="limb_isolated">Limb Isolated</option><option value="submission_control">Submission Control</option></select></div>
+        <div id="isolatedLimbGroup" class="label-group hidden"><label>Isolated Limb</label><select id="isolatedLimb"><option value="none">None</option><option value="left_arm">Left Arm</option><option value="right_arm">Right Arm</option><option value="left_leg">Left Leg</option><option value="right_leg">Right Leg</option><option value="neck">Neck</option></select></div>
+        <div id="passTypeGroup" class="label-group hidden"><label>Pass Type</label><select id="passType"><option value="none">None</option><option value="knee_slice">Knee Slice</option><option value="toreando">Toreando</option><option value="leg_drag">Leg Drag</option><option value="over_under">Over/Under</option><option value="double_under">Double Under</option><option value="x_pass">X Pass</option><option value="other">Other</option></select></div>
+        <div id="sweepTypeGroup" class="label-group hidden"><label>Sweep Type</label><select id="sweepType"><option value="none">None</option><option value="scissor">Scissor</option><option value="flower">Flower</option><option value="hip_bump">Hip Bump</option><option value="butterfly">Butterfly</option><option value="x_guard">X Guard</option><option value="other">Other</option></select></div>
+        <div id="escapeTypeGroup" class="label-group hidden"><label>Escape Type</label><select id="escapeType"><option value="none">None</option><option value="stand_up">Stand Up</option><option value="to_guard">To Guard</option><option value="to_half_guard">To Half Guard</option><option value="to_turtle">To Turtle</option><option value="other">Other</option></select></div>
+        <div id="submissionGroup" class="label-group hidden"><label>Submission Offense / Defense</label><div style="display:flex; gap:5px;"><select id="subOff" style="flex:1"><option value="none">None</option><option value="armbar">Armbar</option><option value="triangle">Triangle</option><option value="kimura">Kimura</option><option value="rnc">RNC</option><option value="omoplata">Omoplata</option><option value="guillotine">Guillotine</option><option value="heel_hook">Heel Hook</option><option value="kneebar">Kneebar</option><option value="americana">Americana</option><option value="wrist_lock">Wrist Lock</option><option value="other">Other</option></select><select id="subDef" style="flex:1"><option value="none">None</option><option value="armbar">Armbar</option><option value="triangle">Triangle</option><option value="kimura">Kimura</option><option value="rnc">RNC</option><option value="omoplata">Omoplata</option><option value="guillotine">Guillotine</option><option value="heel_hook">Heel Hook</option><option value="kneebar">Kneebar</option><option value="americana">Americana</option><option value="wrist_lock">Wrist Lock</option><option value="other">Other</option></select></div></div>
+        <div class="label-group"><label>Activity <span class="shortcut-hint">[A]</span></label><select id="activity"><option value="static">Static</option><option value="sweeping">Sweeping</option><option value="passing">Passing</option><option value="escaping">Escaping</option><option value="submitting">Submitting</option><option value="defending">Defending</option></select></div>
+        <div class="label-group"><label>Notes (optional)</label><textarea id="notes" rows="2" placeholder="Slice loss reason, specific technique, etc."></textarea></div>
+    </div>
+
+    <button id="saveBtn" class="save-btn">📤 Upload to Google Drive</button>
+    <div id="saveStatus" class="status"></div>
+    <div class="footer">Shortcuts: 1‑0 cycle main fields. A cycles activity. S uploads. Data goes directly to your Drive.</div>
+</div>
+
+<script>
+    // --- REPLACE THIS WITH YOUR APPS SCRIPT URL ---
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxvfpbHKokoMLisw4TzfweGWqNx9Sgp0HAFuvJuMBgSg5ZWepYE4OmNfReQjs0gXE6G/exec";
+
+    let currentMode = 'video';
+    let videoFrames = [];
+    let currentImageBlob = null;
+
+    // DOM elements
+    const videoModePanel = document.getElementById('videoModePanel');
+    const imageModePanel = document.getElementById('imageModePanel');
+    const videoPlayer = document.getElementById('videoPlayer');
+    const videoUpload = document.getElementById('videoUpload');
+    const extractFramesBtn = document.getElementById('extractFramesBtn');
+    const thumbnailContainer = document.getElementById('thumbnailContainer');
+    const videoStatus = document.getElementById('videoStatus');
+    const imageCanvas = document.getElementById('imageCanvas');
+    const imageUpload = document.getElementById('imageUpload');
+    const loadImageBtn = document.getElementById('loadImageBtn');
+    const imageStatus = document.getElementById('imageStatus');
+    const saveBtn = document.getElementById('saveBtn');
+    const saveStatus = document.getElementById('saveStatus');
+    const labelerName = document.getElementById('labelerName');
+
+    // Label elements
+    const entryInitiator = document.getElementById('entryInitiator');
+    const entryMethod = document.getElementById('entryMethod');
+    const landingPosition = document.getElementById('landingPosition');
+    const topPlayer = document.getElementById('topPlayer');
+    const topPhase = document.getElementById('topPhase');
+    const bottomPhase = document.getElementById('bottomPhase');
+    const armFrames = document.getElementById('armFrames');
+    const legFrames = document.getElementById('legFrames');
+    const guardStatus = document.getElementById('guardStatus');
+    const torsoControl = document.getElementById('torsoControl');
+    const isolatedLimb = document.getElementById('isolatedLimb');
+    const passType = document.getElementById('passType');
+    const sweepType = document.getElementById('sweepType');
+    const escapeType = document.getElementById('escapeType');
+    const subOff = document.getElementById('subOff');
+    const subDef = document.getElementById('subDef');
+    const activity = document.getElementById('activity');
+    const notes = document.getElementById('notes');
+
+    // Conditional visibility
+    function updateConditionalFields() {
+        const topPhaseVal = topPhase.value;
+        const bottomPhaseVal = bottomPhase.value;
+        const landingVal = landingPosition.value;
+        const activityVal = activity.value;
+
+        document.getElementById('guardStatusGroup').classList.toggle('hidden', !(bottomPhaseVal === 'guard_achieved' || landingVal === 'guard' || landingVal === 'half_guard'));
+        document.getElementById('torsoControlGroup').classList.toggle('hidden', !(topPhaseVal === 'passed_guard' || topPhaseVal === 'limb_isolated' || topPhaseVal === 'submission_applied'));
+        document.getElementById('isolatedLimbGroup').classList.toggle('hidden', topPhaseVal !== 'limb_isolated');
+        document.getElementById('passTypeGroup').classList.toggle('hidden', topPhaseVal !== 'passed_guard');
+        document.getElementById('sweepTypeGroup').classList.toggle('hidden', activityVal !== 'sweeping');
+        document.getElementById('escapeTypeGroup').classList.toggle('hidden', !(activityVal === 'escaping' || bottomPhaseVal === 'escaped'));
+        document.getElementById('submissionGroup').classList.toggle('hidden', !(activityVal === 'submitting' || activityVal === 'defending' || topPhaseVal === 'submission_applied'));
+    }
+    topPhase.addEventListener('change', updateConditionalFields);
+    bottomPhase.addEventListener('change', updateConditionalFields);
+    landingPosition.addEventListener('change', updateConditionalFields);
+    activity.addEventListener('change', updateConditionalFields);
+
+    // Keyboard shortcuts
+    function cycleSelect(selectId, options, forward) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        let idx = select.selectedIndex;
+        idx = (idx + (forward ? 1 : -1) + options.length) % options.length;
+        select.selectedIndex = idx;
+        select.dispatchEvent(new Event('change'));
+    }
+    document.addEventListener('keydown', (e) => {
+        const key = e.key;
+        const shift = e.shiftKey;
+        const forward = !shift;
+        if (key === '1') { cycleSelect('entryInitiator', ['thing1','thing2','both','none'], forward); e.preventDefault(); }
+        else if (key === '2') { cycleSelect('entryMethod', ['takedown_lower','throw_upper','guard_pull','other'], forward); e.preventDefault(); }
+        else if (key === '3') { cycleSelect('landingPosition', ['guard','half_guard','side_control','knee_on_belly','north_south','mount','back','turtle','standing','other'], forward); e.preventDefault(); }
+        else if (key === '4') { cycleSelect('topPlayer', ['thing1','thing2','none'], forward); e.preventDefault(); }
+        else if (key === '5') { cycleSelect('topPhase', ['standing','on_top','passed_guard','limb_isolated','submission_applied'], forward); e.preventDefault(); }
+        else if (key === '6') { cycleSelect('bottomPhase', ['standing','on_bottom','guard_achieved','escaped','submitted'], forward); e.preventDefault(); }
+        else if (key === '7') { cycleSelect('armFrames', ['none','left','right','both'], forward); e.preventDefault(); }
+        else if (key === '8') { cycleSelect('legFrames', ['none','left','right','both'], forward); e.preventDefault(); }
+        else if (key === '9') { cycleSelect('guardStatus', ['active_guard','passive_guard','no_guard'], forward); e.preventDefault(); }
+        else if (key === '0') { cycleSelect('torsoControl', ['legs_active','torso_only','limb_isolated','submission_control'], forward); e.preventDefault(); }
+        else if (key === 'a' || key === 'A') { cycleSelect('activity', ['static','sweeping','passing','escaping','submitting','defending'], forward); e.preventDefault(); }
+        else if (key === 's' || key === 'S') { e.preventDefault(); uploadToDrive(); }
+    });
+
+    // Build CSV line
+    function buildCSVLine(sourceType, clipId, frameIndex, timestamp) {
+        const labels = [
+            sourceType, clipId, frameIndex, timestamp,
+            entryInitiator.value, entryMethod.value, landingPosition.value,
+            topPlayer.value, topPhase.value, bottomPhase.value,
+            armFrames.value, legFrames.value,
+            guardStatus.value,
+            torsoControl.value,
+            isolatedLimb.value,
+            passType.value, sweepType.value, escapeType.value,
+            subOff.value, subDef.value,
+            activity.value,
+            notes.value
+        ];
+        return labels.map(f => `"${String(f).replace(/"/g, '""')}"`).join(',');
+    }
+
+    // Upload to Google Drive via Apps Script
+    async function uploadToDrive() {
+        if (!labelerName.value.trim()) {
+            saveStatus.innerText = 'Please enter your name first.';
+            return;
+        }
+
+        if (currentMode === 'video') {
+            if (videoFrames.length === 0) {
+                saveStatus.innerText = 'No frames to upload. Extract frames first.';
+                return;
+            }
+            saveStatus.innerText = 'Packing frames into ZIP...';
+            const clipId = Date.now().toString();
+            const zip = new JSZip();
+            const csvLines = [];
+            for (let i = 0; i < videoFrames.length; i++) {
+                const frame = videoFrames[i];
+                const filename = `frame_${i}_${Math.round(frame.timestamp*10)}.jpg`;
+                zip.file(filename, frame.blob);
+                const csvLine = buildCSVLine('video_clip', clipId, i, frame.timestamp);
+                csvLines.push(csvLine);
+            }
+            const csvBlob = new Blob([csvLines.join('\n')], {type: 'text/csv'});
+            zip.file('labels.csv', csvBlob);
+            const zipBlob = await zip.generateAsync({type: 'blob'});
+
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('labelerName', labelerName.value);
+            formData.append('clipId', clipId);
+            formData.append('notes', notes.value);
+            formData.append('file', zipBlob, `bjj_${clipId}.zip`);
+
+            saveStatus.innerText = 'Uploading to Google Drive...';
+            try {
+                const response = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.text();
+                saveStatus.innerText = `✅ Uploaded ${videoFrames.length} frames for clip ${clipId}. Response: ${result}`;
+            } catch (err) {
+                saveStatus.innerText = 'Upload error: ' + err.message;
+            }
+        } else {
+            // Image mode
+            if (!currentImageBlob) {
+                saveStatus.innerText = 'No image loaded.';
+                return;
+            }
+            const clipId = Date.now().toString();
+            const filename = `img_${Date.now()}.jpg`;
+            const csvLine = buildCSVLine('image', clipId, 0, 0);
+            const csvBlob = new Blob([csvLine], {type: 'text/csv'});
+            const zip = new JSZip();
+            zip.file(filename, currentImageBlob);
+            zip.file('labels.csv', csvBlob);
+            const zipBlob = await zip.generateAsync({type: 'blob'});
+
+            const formData = new FormData();
+            formData.append('labelerName', labelerName.value);
+            formData.append('clipId', clipId);
+            formData.append('notes', notes.value);
+            formData.append('file', zipBlob, `bjj_img_${clipId}.zip`);
+
+            saveStatus.innerText = 'Uploading...';
+            try {
+                const response = await fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.text();
+                saveStatus.innerText = `✅ Uploaded image ${filename}. Response: ${result}`;
+            } catch (err) {
+                saveStatus.innerText = 'Upload error: ' + err.message;
+            }
+        }
+    }
+
+    // Extract frames (same as before)
+    async function extractFrames(videoElement, fps = 2) {
+        videoFrames = [];
+        const duration = videoElement.duration;
+        const interval = 1 / fps;
+        let currentTime = 0;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        thumbnailContainer.innerHTML = '<div class="status">Extracting frames...</div>';
+        for (let t = 0; t < duration; t += interval) {
+            videoElement.currentTime = t;
+            await new Promise(resolve => { videoElement.onseeked = resolve; });
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            ctx.drawImage(videoElement, 0, 0);
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+            videoFrames.push({ blob, timestamp: t });
+        }
+        displayThumbnails();
+        videoStatus.innerText = `Extracted ${videoFrames.length} frames. Click thumbnails to delete, then upload.`;
+    }
+
+    function displayThumbnails() {
+        thumbnailContainer.innerHTML = '';
+        videoFrames.forEach((frame, idx) => {
+            const url = URL.createObjectURL(frame.blob);
+            const div = document.createElement('div');
+            div.className = 'thumbnail';
+            div.innerHTML = `<img src="${url}" alt="frame ${idx}"><div class="delete-badge" data-idx="${idx}">✖</div>`;
+            div.querySelector('.delete-badge').onclick = (e) => {
+                e.stopPropagation();
+                videoFrames.splice(idx, 1);
+                displayThumbnails();
+                videoStatus.innerText = `Frame deleted. ${videoFrames.length} remaining.`;
+            };
+            thumbnailContainer.appendChild(div);
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // Mode switching
+    function setMode(mode) {
+        currentMode = mode;
+        if (mode === 'video') {
+            videoModePanel.classList.remove('hidden');
+            imageModePanel.classList.add('hidden');
+            document.getElementById('btnVideoMode').classList.add('active');
+            document.getElementById('btnImageMode').classList.remove('active');
+        } else {
+            videoModePanel.classList.add('hidden');
+            imageModePanel.classList.remove('hidden');
+            document.getElementById('btnVideoMode').classList.remove('active');
+            document.getElementById('btnImageMode').classList.add('active');
+        }
+    }
+    document.getElementById('btnVideoMode').onclick = () => setMode('video');
+    document.getElementById('btnImageMode').onclick = () => setMode('image');
+
+    // Video upload & extraction
+    videoUpload.onchange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            const url = URL.createObjectURL(e.target.files[0]);
+            videoPlayer.src = url;
+            videoPlayer.load();
+            videoFrames = [];
+            thumbnailContainer.innerHTML = '';
+            videoStatus.innerText = 'Video loaded. Click "Extract Frames".';
+        }
+    };
+    extractFramesBtn.onclick = () => {
+        if (!videoPlayer.src) {
+            videoStatus.innerText = 'Load a video first.';
+            return;
+        }
+        extractFrames(videoPlayer);
+    };
+
+    // Image upload
+    imageUpload.onchange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new Image();
+                img.onload = () => {
+                    imageCanvas.width = img.width;
+                    imageCanvas.height = img.height;
+                    const ctx = imageCanvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    imageCanvas.toBlob(blob => { currentImageBlob = blob; }, 'image/jpeg', 0.9);
+                    imageStatus.innerText = 'Image loaded. Ready to upload.';
+                };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    loadImageBtn.onclick = () => {
+        if (imageUpload.files && imageUpload.files[0]) {
+            imageUpload.dispatchEvent(new Event('change'));
+        } else {
+            imageStatus.innerText = 'Select an image first.';
+        }
+    };
+
+    saveBtn.onclick = uploadToDrive;
+    setMode('video');
+    updateConditionalFields();
+</script>
+</body>
+</html>
+
+
