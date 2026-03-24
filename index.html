@@ -186,7 +186,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>BJJ Data Collector – Two Column</h1>
+    <h1>BJJ Data Collector</h1>
     <div class="mode-buttons">
         <button id="btnVideoMode" class="mode-btn active">🎥 Video Mode</button>
         <button id="btnImageMode" class="mode-btn">🖼️ Image Mode</button>
@@ -490,32 +490,41 @@
     };
 
     // Image upload
-    imageUpload.onchange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const img = new Image();
-                img.onload = () => {
-                    imageCanvas.width = img.width;
-                    imageCanvas.height = img.height;
-                    const ctx = imageCanvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0);
-                    imageCanvas.toBlob(blob => { currentImageBlob = blob; }, 'image/jpeg', 0.9);
-                    imageStatus.innerText = 'Image loaded. Ready to upload.';
-                };
-                img.src = ev.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
+    // Image upload - FIXED
+imageUpload.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) {
+        imageStatus.innerText = 'No file selected.';
+        return;
+    }
+    imageStatus.innerText = 'Loading image...';
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+            imageCanvas.width = img.width;
+            imageCanvas.height = img.height;
+            const ctx = imageCanvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            // Convert canvas to blob for upload
+            imageCanvas.toBlob(blob => { 
+                currentImageBlob = blob; 
+                imageStatus.innerText = `✅ Image loaded: ${file.name}`;
+            }, 'image/jpeg', 0.9);
+        };
+        img.src = ev.target.result;
     };
-    loadImageBtn.onclick = () => {
-        if (imageUpload.files && imageUpload.files[0]) {
-            imageUpload.dispatchEvent(new Event('change'));
-        } else {
-            imageStatus.innerText = 'Select an image first.';
-        }
+    reader.onerror = () => {
+        imageStatus.innerText = 'Error reading file.';
     };
+    reader.readAsDataURL(file);
+};
+
+loadImageBtn.onclick = () => {
+    // Clear any previous selection to ensure new file picker opens
+    imageUpload.value = '';
+    imageUpload.click();
+};
 
     saveBtn.onclick = uploadToDrive;
     setMode('video');
